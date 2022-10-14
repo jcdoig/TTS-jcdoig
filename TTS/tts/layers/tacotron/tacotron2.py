@@ -111,6 +111,18 @@ class Encoder(nn.Module):
         o, _ = self.lstm(o)
         return o
 
+    
+class Outputs:
+    def __init__(self, outputs, stop_tokens, alignments):
+        self.outputs = [x for x in outputs]
+        self.stop_tokens = [x for x in stop_tokens]
+        self.alignments = [x for x in alignments]
+
+        
+def get_best_record(records):
+    records = sorted(records, lambda x: x.stop_tokes[-1] - 0.5, reverse=True)
+    best = records[0]
+    return best.outputs, best.stop_tokens, best.alignments
 
 # adapted from https://github.com/NVIDIA/tacotron2/
 class Decoder(nn.Module):
@@ -347,6 +359,7 @@ class Decoder(nn.Module):
         outputs, stop_tokens, alignments, t = [], [], [], 0
 
         exit_condition = 0
+        records = []
         while True:
             memory = self.prenet(memory)
             decoder_output, alignment, stop_token = self.decode(memory)
@@ -355,6 +368,7 @@ class Decoder(nn.Module):
             stop_tokens += [stop_token]
             alignments += [alignment]
 
+            records.append(Outputs(outputs, stop_tokens, alignments))
             if stop_token > self.stop_threshold and t > inputs.shape[0] // 2:
                 exit_condition += 1
             else:
@@ -369,6 +383,8 @@ class Decoder(nn.Module):
 
             memory = self._update_memory(decoder_output)
             t += 1
+
+        outputs, stop_tokens, alignments = get_best_record(records)
 
         outputs, stop_tokens, alignments = self._parse_outputs(outputs, stop_tokens, alignments)
 
