@@ -120,7 +120,7 @@ class Outputs:
 
         
 def get_best_record(records):
-    records = sorted(records, lambda x: x.stop_tokes[-1] - 0.5, reverse=True)
+    records = sorted(records, key=lambda x: x.stop_tokens[-1], reverse=True)
     best = records[0]
     return best.outputs, best.stop_tokens, best.alignments
 
@@ -368,18 +368,24 @@ class Decoder(nn.Module):
             stop_tokens += [stop_token]
             alignments += [alignment]
 
-            records.append(Outputs(outputs, stop_tokens, alignments))
             if stop_token > self.stop_threshold and t > inputs.shape[0] // 2:
+                records.append(Outputs(outputs, stop_tokens, alignments))
                 exit_condition += 1
             else:
                 exit_condition = 0
             
             if exit_condition > 5:
                 break
-            
-            if len(outputs) == self.max_decoder_steps:
-                print(f"   > Decoder stopped with `max_decoder_steps` {self.max_decoder_steps}")
+
+            if t > inputs.size()[1] * 7:
+                # This prevents the audio render to be too long
+                records.append(Outputs(outputs, stop_tokens, alignments))
                 break
+            # I'm overwriting this stop condition
+            # if len(outputs) == self.max_decoder_steps:
+            #     print(f"   > Decoder stopped with `max_decoder_steps` {self.max_decoder_steps}")
+            #     records.append(Outputs(outputs, stop_tokens, alignments))
+            #     break
 
             memory = self._update_memory(decoder_output)
             t += 1
